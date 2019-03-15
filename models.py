@@ -1,4 +1,5 @@
-from sqlalchemy import Column, MetaData, Table, text, DateTime, String
+from sqlalchemy import Column, MetaData, Table, UniqueConstraint, text, \
+                       DateTime, String
 from sqlalchemy.dialects.postgresql.base import UUID
 
 
@@ -25,9 +26,11 @@ t_document_hist = Table(
 
 t_document_event = Table(
     "document_event", metadata,
-    Column("parent", UUID, primary_key=True, server_default=SQL_UUID),
-    Column("hist", UUID, primary_key=True, server_default=SQL_UUID),
+    Column("parent", UUID),
+    Column("hist", UUID),
     Column("uid", UUID, nullable=False),
-    Column("title", String, nullable=False),
+    Column("reason", String, nullable=False),
+    Column("comment", String),
     Column("tstamp", DateTime, nullable=False, server_default=SQL_UTC),
+    UniqueConstraint("parent", "hist", name="parent_hist_unique"),
 )
