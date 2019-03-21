@@ -67,5 +67,45 @@ async def post_document(request, parent=None):
     })
 
 
+@app.route("/graph/<hid:uuid>")
+async def get_graph(request, hid):
+    cte_query = t_document_event.select() \
+                                .where(t_document_event.c.hist == str(hid)) \
+                                .cte("all_events", recursive=True)
+    ref_query = cte_query.alias("ref")
+    evt_query = t_document_event.alias("evt")
+    full_events_query = cte_query.union(
+        select(
+            columns=[evt_query],
+            from_obj=[ref_query, evt_query],
+            whereclause=(evt_query.c.parent == ref_query.c.hist) |
+                        (evt_query.c.hist == ref_query.c.parent),
+        )
+    ).select().order_by(cte_query.c.tstamp)
+
+    async with pg.transaction(isolation="repeatable_read") as conn:
+        edges = await pg.fetch(full_events_query)
+        nodes = await pg.fetch(t_document_hist.select().where(
+            t_document_hist.c.hid.in_([r["hist"] for r in edges])
+        ).order_by(t_document_hist.c.tstamp))
+        print(edges)
+        print(nodes)
+    return response.json({
+        "nodes": [{
+            "hid": str(node["hid"]),
+            "pid": node["pid"],
+            "title": node["title"],
+            "tstamp": node["tstamp"].strftime("%Y-%m-%dT%H:%M:%S.%fZ"),
+        } for node in nodes],
+        "edges": [{
+            "parent": edge["parent"] and str(edge["parent"]),
+            "hist": str(edge["hist"]),
+            "reason": edge["reason"],
+            "comment": edge["comment"],
+            "tstamp": edge["tstamp"].strftime("%Y-%m-%dT%H:%M:%S.%fZ"),
+        } for edge in edges],
+    })
+
+
 if __name__ == "__main__":
     app.run(host="0.0.0.0", port=8000, debug=True)
