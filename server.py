@@ -3,12 +3,14 @@ import os
 
 from asyncpgsa import pg
 from sanic import response, Sanic
+from sanic_cors import CORS
 from sqlalchemy import select
 
 from models import t_user_info, t_document_hist, t_document_event
 
 
 app = Sanic(__name__)
+CORS(app, automatic_options=True)
 
 
 @app.listener("before_server_start")
