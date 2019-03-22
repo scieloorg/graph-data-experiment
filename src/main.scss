@@ -1,0 +1,53 @@
+$insert_arrow_color: #aaf;
+$update_arrow_color: #777;
+
+
+body, svg {
+  padding: 0;
+  margin: 0;
+}
+
+
+/* Arrows */
+#insert { fill: $insert_arrow_color; }
+#update { fill: $update_arrow_color; }
+
+
+.nodes {
+  circle {
+    fill: #444;
+    stroke: #333;
+    stroke-width: 2px;
+    pointer-events: all;
+  }
+
+  circle.empty {
+    fill: #fff0;
+    stroke: none;
+  }
+
+  circle.leaf {
+    fill: #cfc;
+  }
+}
+
+
+.edges {
+  .edge {
+    fill: none;
+    stroke: $update_arrow_color;
+    stroke-width: 1.5px;
+  }
+
+  .edge.insert {
+    stroke: $insert_arrow_color;
+    stroke-dasharray: 0,2 1;
+  }
+}
+
+
+text {
+  font: 10px sans-serif;
+  pointer-events: none;
+  text-shadow: 0 1px 0 #fff, 1px 0 0 #fff, 0 -1px 0 #fff, -1px 0 0 #fff;
+}
