@@ -43,12 +43,20 @@ with the actual credentials.
 
 ## Back-end setup
 
-To install the server dependencies/requirements
+To install the server dependencies/requirements (frozen versions)
 in a virtual environment:
 
 ```bash
 python -m venv venv # Create a virtual environment
 . venv/bin/activate # Activate the virtual environment
+pip install -r requirements.txt
+```
+
+Or, to install the current version of the dependencies
+instead of the frozen versions
+(these are the direct dependencies):
+
+```bash
 pip install sanic sanic-cors sqlalchemy asyncpgsa
 ```
 
