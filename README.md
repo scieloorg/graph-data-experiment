@@ -24,12 +24,17 @@ docker run --rm \
 ```
 
 One still needs to initialize this database.
-Assuming you're in a virtual environment
-(such as the one described in the back-end session of this text),
+Assuming you have ``alembic`` and ``psycopg2``
+(from the operating system packages
+ or from a virtual environment
+ such as the one described in the back-end session of this text,
+ by installing the frozen versions of these packages
+ with ``pip install -r requirements.migrations.txt``
+ or their current version
+ with ``pip install alembic psycopg2``),
 you can bootstrap that database with the migration scripts:
 
 ```bash
-pip install alembic psycopg2 # One can also use the package for the OS
 export PGSQL_URL=postgres://user:pass@localhost:5432/histdb
 alembic upgrade head
 ```
