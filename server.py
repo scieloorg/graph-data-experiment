@@ -29,7 +29,9 @@ async def post_user(request):
     name = request.json["name"]
     user = await pg.fetchrow(
         t_user_info.insert()
-                   .values(name=name)
+                   .values(name=name,
+                           ldap_cn="", # TODO: Replace this by LDAP
+                           uid=name)
                    .returning(t_user_info.c.uid, t_user_info.c.tstamp)
     )
     return response.json({
@@ -50,24 +52,25 @@ async def post_document(request, parent=None):
         return response.json({"error": "need_pid_string"}, status=400)
     if "title" not in payload or not isinstance(payload["title"], str):
         return response.json({"error": "need_title_string"}, status=400)
+    if "published" in payload and not isinstance(payload["published"], bool):
+        return response.json({"error": "invalid_published_type"}, status=400)
 
-    # TODO: Unhardcode the user
-    uid_query = select([t_user_info.c.uid]) \
-                .where(t_user_info.c.name == "danilo")
     async with pg.transaction() as conn:
         node = await conn.fetchrow(t_document_hist.insert().values(
             pid=payload["pid"],
             title=payload["title"],
+            published=payload.get("published", False),
         ).returning(t_document_hist.c.hid, t_document_hist.c.tstamp))
         edge = await conn.fetchrow(t_document_event.insert().values(
             parent=parent,
             hist=node["hid"],
-            uid=uid_query,
+            uid="danilo", # TODO: Unhardcode this
             reason="insert" if parent is None else "update",
         ).returning(t_document_event.c.tstamp))
     return response.json({
         "hid": str(node["hid"]),
-        "content_tstamp": node["tstamp"].strftime("%Y-%m-%dT%H:%M:%S.%fZ"),
+        "content_tstamp": node["tstamp"] and
+                          node["tstamp"].strftime("%Y-%m-%dT%H:%M:%S.%fZ"),
         "action_tstamp": edge["tstamp"].strftime("%Y-%m-%dT%H:%M:%S.%fZ"),
     })
 
@@ -98,7 +101,8 @@ async def get_graph(request, hid):
             "hid": str(node["hid"]),
             "pid": node["pid"],
             "title": node["title"],
-            "tstamp": node["tstamp"].strftime("%Y-%m-%dT%H:%M:%S.%fZ"),
+            "tstamp": node["tstamp"] and
+                      node["tstamp"].strftime("%Y-%m-%dT%H:%M:%S.%fZ"),
         } for node in nodes],
         "edges": [{
             "parent": edge["parent"] and str(edge["parent"]),
