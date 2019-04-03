@@ -89,12 +89,10 @@ async def get_graph(request, hid):
     ).select().order_by(cte_query.c.tstamp)
 
     async with pg.transaction(isolation="repeatable_read") as conn:
-        edges = await pg.fetch(full_events_query)
-        nodes = await pg.fetch(t_document_hist.select().where(
+        edges = await conn.fetch(full_events_query)
+        nodes = await conn.fetch(t_document_hist.select().where(
             t_document_hist.c.hid.in_([r["hist"] for r in edges])
         ).order_by(t_document_hist.c.tstamp))
-        print(edges)
-        print(nodes)
     return response.json({
         "nodes": [{
             "hid": str(node["hid"]),
