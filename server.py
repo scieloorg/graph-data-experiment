@@ -1,6 +1,8 @@
 #!/usr/bin/env python3
 import os
+import re
 
+import asyncpg
 from asyncpgsa import pg
 from sanic import response, Sanic
 from sanic_cors import CORS
@@ -19,6 +21,37 @@ app.static("/main.js", "dist/main.js")
 @app.listener("before_server_start")
 async def setup_db(app, loop):
     await pg.init(os.environ["PGSQL_URL"])
+
+
+@app.exception(asyncpg.IntegrityConstraintViolationError)
+def handle_database_exception(request, exc):
+    return response.json({
+        "error": re.sub(r"([^A-Z])([A-Z])", r"\1_\2",
+                        type(exc).__name__).lower(),
+        "constraint": exc.constraint_name,
+        "table": exc.table_name,
+        "column": exc.column_name,
+    }, status=400)
+
+
+@app.exception(asyncpg.RaiseError)
+def handle_database_function_raise(request, exc):
+    return response.json({"error": exc.message}, status=400)
+
+
+@app.exception(asyncpg.DataError)
+def handle_database_exception(request, exc):
+    # TODO: Add validators elsewhere (this might be a client error)
+    return response.json({
+        "error": "invalid_datatype",
+        "detail": (exc.__cause__ or exc).args[0],
+    }, status=500)
+
+
+@app.exception(asyncpg.PostgresError)
+def handle_database_exception(request, exc):
+    return response.json({"error": "internal_database_error",
+                          "message": exc.message}, status=500)
 
 
 @app.route("/user", methods=["POST"])
