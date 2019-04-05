@@ -63,8 +63,10 @@ function drawGraph(graph){
     if(edge.parent === null) {
       edge.source = `empty-before-${count++}`
       graph.nodes.push({hid: edge.source, empty: true, x:-300, y: 0})
+      edge.marker = "insert"
     } else {
       edge.source = edge.parent
+      edge.marker = "update"
     }
     edge.target = edge.hist
   })
@@ -91,8 +93,8 @@ function drawGraph(graph){
     .selectAll("path")
       .data(graph.edges)
       .enter().append("path")
-        .attr("class", (d) => " edge " + d.reason)
-        .attr("marker-end", (d) => `url(#${d.reason})`)
+        .attr("class", (d) => " edge " + d.marker)
+        .attr("marker-end", (d) => `url(#${d.marker})`)
 
   var node = svg.append("g")
     .attr("class", "nodes")
