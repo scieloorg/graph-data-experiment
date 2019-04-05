@@ -7,6 +7,8 @@ from asyncpgsa import pg
 from sanic import response, Sanic
 from sanic_cors import CORS
 from sqlalchemy import select
+import sqlalchemy as sa
+import ujson
 
 from models import t_user_info, t_document_hist, t_document_event
 
@@ -145,6 +147,161 @@ async def get_graph(request, hid):
             "tstamp": edge["tstamp"].strftime("%Y-%m-%dT%H:%M:%S.%fZ"),
         } for edge in edges],
     })
+
+
+@app.route("/node/<hid:uuid>")
+async def get_node(request, hid):
+    node_query = t_document_hist.select().where(t_document_hist.c.hid == hid)
+    node = await pg.fetchrow(node_query)
+    if not node:
+        return response.json({"error": "not_found"}, status=404)
+    if node["deleted"]:
+        return response.json({"error": "gone"}, status=410)
+    return response.json({
+        "hid": str(node["hid"]),
+        "pid": node["pid"],
+        "title": node["title"],
+        "metadata": ujson.loads(node["metadata"]),
+        "published": node["published"],
+        "tstamp": node["tstamp"] and
+                  node["tstamp"].strftime("%Y-%m-%dT%H:%M:%S.%fZ"),
+    })
+
+
+@app.route("/edge/<parent:uuid>/<hist:uuid>")
+@app.route("/edge/null/<hist:uuid>")
+async def get_edge_event(request, parent=None, hist=None):
+    edge_query = t_document_event.select().where(
+        (t_document_event.c.parent == parent) &
+        (t_document_event.c.hist == hist)
+    )
+    edge = await pg.fetchrow(edge_query)
+    if not edge:
+        return response.json({"error": "not_found"}, status=404)
+    return response.json({
+        "parent": str(edge["parent"]),
+        "hist": str(edge["hist"]),
+        "uid": edge["uid"],
+        "reason": edge["reason"],
+        "comment": edge["comment"],
+        "tstamp": edge["tstamp"] and
+                  edge["tstamp"].strftime("%Y-%m-%dT%H:%M:%S.%fZ"),
+    })
+
+
+@app.route("/node/<hid:uuid>", methods=["PATCH"])
+async def patch_node(request, hid):
+    await pg.fetchrow(t_document_hist.update().values(
+        **request.json # TODO: validate the input
+    ).where(t_document_hist.c.hid == hid))
+    return response.json({"status": "updated"})
+
+
+@app.route("/edge/<parent:uuid>/<hist:uuid>", methods=["PATCH"])
+@app.route("/edge/null/<hist:uuid>", methods=["PATCH"])
+async def patch_edge_event(request, parent=None, hist=None):
+    await pg.fetchrow(t_document_event.update().values(
+        **request.json # TODO: validate the input
+    ).where(
+        (t_document_event.c.parent == parent) &
+        (t_document_event.c.hist == hist)
+    ))
+    return response.json({"status": "updated"})
+
+
+@app.route("/node/<hid:uuid>", methods=["DELETE"])
+async def delete_node(request, hid):
+    str_result = await pg.execute(
+        t_document_hist.delete().where(t_document_hist.c.hid == hid)
+    )
+    deleted_count = int(str_result.split()[1])
+    if deleted_count == 0:
+        return response.json({"error": "not_found"}, status=404)
+    return response.json({"status": "deleted"})
+
+
+@app.route("/edge/<parent:uuid>/<hist:uuid>", methods=["DELETE"])
+@app.route("/edge/null/<hist:uuid>", methods=["DELETE"])
+async def delete_edge_event(request, parent=None, hist=None):
+    str_result = await pg.fetch(t_document_event.delete().where(
+        (t_document_event.c.parent == parent) &
+        (t_document_event.c.hist == hist)
+    ))
+    deleted_count = int(str_result.split()[1])
+    if deleted_count == 0:
+        return response.json({"error": "not_found"}, status=404)
+    return response.json({"status": "deleted"})
+
+
+@app.route("/node", methods=["POST"])
+async def post_node(request):
+    node_query = t_document_hist.insert().values(
+        **request.json # TODO: validate the input
+    ).returning(t_document_hist.c.hid)
+    node = await pg.fetchrow(node_query)
+    return response.json({
+        "status": "inserted",
+        "hid": str(node["hid"]),
+    })
+
+@app.route("/edge/<parent:uuid>/<hist:uuid>", methods=["POST"])
+@app.route("/edge/null/<hist:uuid>", methods=["POST"])
+async def post_edge_event(request, parent=None, hist=None):
+    await pg.fetchrow(t_document_event.insert().values(
+        parent=parent,
+        hist=hist,
+        **request.json # TODO: validate the input
+    ))
+    return response.json({"status": "inserted"})
+
+
+@app.route("/node/<hid:uuid>", methods=["PUT"])
+async def put_node(request, hid):
+    async with pg.transaction() as conn:
+        await conn.execute(
+            t_document_hist.delete().where(t_document_hist.c.hid == hid)
+        )
+        node = await conn.fetchrow(t_document_hist.insert().values(
+            **request.json # TODO: validate the input
+        ).returning(t_document_hist.c.hid))
+    return response.json({
+        "status": "replaced",
+        "hid": str(node["hid"]),
+    })
+
+
+@app.route("/edge/<parent:uuid>/<hist:uuid>", methods=["PUT"])
+@app.route("/edge/null/<hist:uuid>", methods=["PUT"])
+async def put_edge_event(request, parent=None, hist=None):
+    async with pg.transaction() as conn:
+        await conn.execute(t_document_event.delete().where(
+            (t_document_event.c.parent == parent) &
+            (t_document_event.c.hist == hist)
+        ))
+        await conn.fetchrow(t_document_event.insert().values(
+            parent=parent,
+            hist=hist,
+            **request.json # TODO: validate the input
+        ))
+    return response.json({"status": "replaced"})
+
+
+@app.route("/node")
+async def get_nodes(request):
+    get_nodes_query = select([t_document_hist.c.hid])
+    nodes = await pg.fetch(get_nodes_query)
+    return response.json({"nodes": [str(node["hid"]) for node in nodes]})
+
+
+@app.route("/edge")
+async def get_edges(request):
+    get_edges_query = select([t_document_event.c.parent,
+                              t_document_event.c.hist])
+    edges = await pg.fetch(get_edges_query)
+    return response.json({"edges": [{
+        "parent": edge["parent"] and str(edge["parent"]),
+        "hist": str(edge["hist"]),
+    } for edge in edges]})
 
 
 if __name__ == "__main__":
