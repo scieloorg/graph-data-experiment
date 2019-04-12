@@ -10,11 +10,13 @@ from sqlalchemy import select
 import sqlalchemy as sa
 import ujson
 
+import auth
 from models import t_user_info, t_document_hist, t_document_event
 
 
 app = Sanic(__name__)
 CORS(app, automatic_options=True)
+app.blueprint(auth.bp)
 app.static("/", "dist/index.html")
 app.static("/main.css", "dist/main.css")
 app.static("/main.js", "dist/main.js")
