@@ -1,3 +1,4 @@
+from contextlib import asynccontextmanager
 import os
 import re
 from urllib.parse import parse_qs, unquote, urlparse
@@ -41,6 +42,13 @@ def ldap_escape_query(value):
 def ldap_join_dn(*args):
     """Join already escaped LDAP distinguished name parts."""
     return ",".join(filter(None, args))
+
+
+class LDAPError(Exception): pass
+class LDAPUserNotFound(LDAPError): pass
+class LDAPBindError(LDAPError): pass
+class LDAPInvalidCredentials(LDAPBindError): pass
+class LDAPInvalidAdminCredentials(LDAPBindError): pass
 
 
 class LDAPAuth:
@@ -114,38 +122,37 @@ class LDAPAuth:
         return ldap_join_dn("cn=" + ldap_escape_dn(cn),
                             self.dn_suffix_map[context])
 
+    @asynccontextmanager
     async def bind(self, dn, password):
         client = bonsai.LDAPClient(self.url)
         client.set_cert_policy("allow") # TODO: Add certificate
         client.set_credentials("SIMPLE", user=dn, password=password)
         try:
             async with client.connect(is_async=True) as conn:
-                return True
-        except:
-            pass
-        return False
+                yield conn
+        except bonsai.AuthenticationError as exc:
+            raise LDAPInvalidCredentials from exc
 
     async def get_user_cn(self, user):
-        client = bonsai.LDAPClient(self.url)
-        client.set_cert_policy("allow") # TODO: Add certificate
-        client.set_credentials("SIMPLE",
-            user=self.admin_dn,
-            password=self.admin_pass,
-        )
-        try:
-            async with client.connect(is_async=True) as conn:
-                result = await conn.search(
-                    self.dn_suffix_map["user"],
-                    bonsai.LDAPSearchScope.ONELEVEL,
-                    self.search_template.format(ldap_escape_query(user),
-                                                **self.query_dict),
-                )
-                if not result:
-                    return response.json({"error": "unauthorized"}, status=401)
+        async with self.bind(self.admin_dn, self.admin_pass) as conn:
+            result = await conn.search(
+                self.dn_suffix_map["user"],
+                bonsai.LDAPSearchScope.ONELEVEL,
+                self.search_template.format(ldap_escape_query(user),
+                                            **self.query_dict),
+            )
+            try:
                 return result[0]["cn"][0]
-        except:
-            pass
-        return None
+            except (IndexError, KeyError):
+                raise LDAPUserNotFound
+
+    async def authenticate(self, user, password):
+        try:
+            dn = self.cn2dn(await self.get_user_cn(user))
+        except LDAPInvalidCredentials:
+            raise LDAPInvalidAdminCredentials
+        async with self.bind(dn, password) as conn:
+            return None
 
 
 LDAPAuth.__doc__ = LDAPAuth.__doc__.format(**globals())
@@ -155,5 +162,17 @@ ldap = LDAPAuth(os.environ["LDAP_DSN"])
 @bp.route("/auth", methods=["POST"])
 async def post_auth(request):
     payload = request.json
-    dn = ldap.cn2dn(await ldap.get_user_cn(payload["uid"]))
-    return response.json({"auth": await ldap.bind(dn, payload["password"])})
+    try:
+        await ldap.authenticate(
+            user=payload["uid"],
+            password=payload["password"],
+        )
+        return response.json({"auth": True})
+    except LDAPError as exc:
+        reason = "_".join(re.findall("[A-Z][^A-Z]+",
+                                     type(exc).__name__)).lower()
+    return response.json({
+        "auth": False,
+        "error": "unauthorized",
+        "reason": reason,
+    }, status=401)
