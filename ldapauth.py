@@ -1,17 +1,13 @@
 from contextlib import asynccontextmanager
-import os
 import re
 from urllib.parse import parse_qs, unquote, urlparse
 
 import bonsai
-from sanic import Blueprint, response
 
 
 LDAP_DEFAULT_USER_FIELD = "sAMAccountName"
 LDAP_DEFAULT_SEARCH_TEMPLATE = "(&(objectClass=person)({user_field}={0}))"
 
-
-bp = Blueprint(__name__)
 
 # Avoid bug described in https://github.com/noirello/bonsai/issues/25
 bonsai.set_connect_async(False)
@@ -113,23 +109,3 @@ class LDAPAuth:
 
 
 LDAPAuth.__doc__ = LDAPAuth.__doc__.format(**globals())
-ldap = LDAPAuth(os.environ["LDAP_DSN"])
-
-
-@bp.route("/auth", methods=["POST"])
-async def post_auth(request):
-    payload = request.json
-    try:
-        await ldap.authenticate(
-            user=payload["uid"],
-            password=payload["password"],
-        )
-        return response.json({"auth": True})
-    except LDAPError as exc:
-        reason = "_".join(re.findall("[A-Z][^A-Z]+",
-                                     type(exc).__name__)).lower()
-    return response.json({
-        "auth": False,
-        "error": "unauthorized",
-        "reason": reason,
-    }, status=401)

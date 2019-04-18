@@ -9,16 +9,16 @@ from sanic_cors import CORS
 from sqlalchemy import select
 import ujson
 
-import auth
+from ldapauth import LDAPAuth, LDAPError
 from models import t_user_info, t_document_hist, t_document_event
 
 
 app = Sanic(__name__)
 CORS(app, automatic_options=True)
-app.blueprint(auth.bp)
 app.static("/", "dist/index.html")
 app.static("/main.css", "dist/main.css")
 app.static("/main.js", "dist/main.js")
+ldap = LDAPAuth(os.environ["LDAP_DSN"])
 
 
 @app.listener("before_server_start")
@@ -55,6 +55,25 @@ def handle_database_data_error(request, exc):
 def handle_database_exception(request, exc):
     return response.json({"error": "internal_database_error",
                           "message": exc.message}, status=500)
+
+
+@app.route("/auth", methods=["POST"])
+async def post_auth(request):
+    payload = request.json
+    try:
+        await ldap.authenticate(
+            user=payload["uid"],
+            password=payload["password"],
+        )
+        return response.json({"auth": True})
+    except LDAPError as exc:
+        reason = "_".join(re.findall("[A-Z][^A-Z]+",
+                                     type(exc).__name__)).lower()
+    return response.json({
+        "auth": False,
+        "error": "unauthorized",
+        "reason": reason,
+    }, status=401)
 
 
 @app.route("/user", methods=["POST"])
