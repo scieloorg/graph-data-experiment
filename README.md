@@ -143,11 +143,12 @@ echo https://$GD_LDAPADMIN_IP
 
 ## Back-end setup
 
+This server requires Python 3.7+.
 To install the server dependencies/requirements (frozen versions)
 in a virtual environment:
 
 ```bash
-python -m venv venv # Create a virtual environment
+python3 -m venv venv # Create a virtual environment
 . venv/bin/activate # Activate the virtual environment
 pip install -r requirements.txt
 ```
@@ -157,7 +158,7 @@ instead of the frozen versions
 (these are the direct dependencies):
 
 ```bash
-pip install sanic sanic-cors sqlalchemy asyncpgsa
+pip install sanic sanic-cors sqlalchemy asyncpgsa bonsai
 ```
 
 To run the web server in a already activated virtual environment
