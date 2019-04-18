@@ -1,8 +1,10 @@
-from sqlalchemy import Column, Index, MetaData, Table, text, ForeignKey, \
+from sqlalchemy import Column, ForeignKey, Index, MetaData, Table, \
+                       null, text, \
                        Boolean, DateTime, String
 from sqlalchemy.dialects.postgresql import JSONB, UUID
 
 
+SQL_NULL = null()
 SQL_UTC = text("timezone('UTC'::text, CURRENT_TIMESTAMP)")
 SQL_UUID = text("gen_random_uuid()") # Require pgcrypto
 
@@ -58,5 +60,5 @@ parent_hist_index = Index("parent_hist_index",
 null_hist_index = Index("null_hist_index",
     t_document_event.c.hist,
     unique=True,
-    postgresql_where=t_document_event.c.parent == None,
+    postgresql_where=t_document_event.c.parent == SQL_NULL,
 )

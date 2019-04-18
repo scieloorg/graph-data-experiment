@@ -7,7 +7,6 @@ from asyncpgsa import pg
 from sanic import response, Sanic
 from sanic_cors import CORS
 from sqlalchemy import select
-import sqlalchemy as sa
 import ujson
 
 import auth
@@ -28,7 +27,7 @@ async def setup_db(app, loop):
 
 
 @app.exception(asyncpg.IntegrityConstraintViolationError)
-def handle_database_exception(request, exc):
+def handle_database_integrity_constraint_violation(request, exc):
     return response.json({
         "error": re.sub(r"([^A-Z])([A-Z])", r"\1_\2",
                         type(exc).__name__).lower(),
@@ -44,7 +43,7 @@ def handle_database_function_raise(request, exc):
 
 
 @app.exception(asyncpg.DataError)
-def handle_database_exception(request, exc):
+def handle_database_data_error(request, exc):
     # TODO: Add validators elsewhere (this might be a client error)
     return response.json({
         "error": "invalid_datatype",
