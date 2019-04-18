@@ -5,6 +5,10 @@ Experiment on persistent data history storage as a DAG.
 The current working directory for all commands described here
 is the repository root directory.
 
+The extra tools required for running this experiment as described here
+are Docker and [jq](https://github.com/stedolan/jq).
+
+
 ## Database setup
 
 It's based on PostgreSQL.
@@ -44,6 +48,97 @@ from the docker call in the example.
 To bootstrap this otherwhere
 just replace the PGSQL_URL environment variable
 with the actual credentials.
+
+
+## LDAP Authentication setup
+
+For testing the application in an isolated environment,
+one can run OpenLDAP and populate it with some users.
+An example using OpenLDAP v2.4.47:
+
+```bash
+LDAP_MAIN_PASSWORD=$(head -c9 /dev/urandom | hexdump -e '"%x"')
+
+docker network create gd-network
+docker run --rm \
+           -d \
+           -p 636:636 \
+           --name gd-ldap \
+           --hostname graph.data \
+           --network gd-network \
+           --env LDAP_ADMIN_PASSWORD="$LDAP_MAIN_PASSWORD" \
+           --env LDAP_CONFIG_PASSWORD="$LDAP_MAIN_PASSWORD" \
+           --env LDAP_DOMAIN="graph.data" \
+           --env LDAP_ORGANISATION="Organise & Organize Company Ltd." \
+           --env LDAP_TLS_VERIFY_CLIENT=try \
+           osixia/openldap:1.2.4
+
+# Create an organizational unit, a common user and an "admin" user
+docker exec -i gd-ldap ldapadd -x \
+                               -D "cn=admin,dc=graph,dc=data" \
+                               -w "$LDAP_MAIN_PASSWORD" \
+                               -H ldap://localhost \
+                               <<EOF
+dn: ou=users,dc=graph,dc=data
+ou: users
+objectClass: organizationalUnit
+
+dn: cn=Feykee Yusahr,ou=users,dc=graph,dc=data
+sn: Yusahr
+cn: Feykee Yusahr
+uid: feykee
+objectClass: person
+objectClass: posixAccount
+uidNumber: 1000
+gidNumber: 500
+homeDirectory: /home/users/feykee
+userPassword: $(docker exec -i gd-ldap slappasswd -s "userpw")
+
+dn: uid=admin4gd,dc=graph,dc=data
+uid: admin4gd
+objectClass: account
+objectClass: simpleSecurityObject
+userPassword: $(docker exec -i gd-ldap slappasswd -s "adminpw")
+EOF
+
+# Grant access rights to the "admin4gd" user
+docker exec -i gd-ldap ldapmodify -x \
+                                  -D "cn=admin,cn=config" \
+                                  -w "$LDAP_MAIN_PASSWORD" \
+                                  -H ldap://localhost <<EOF
+dn: olcDatabase={1}mdb,cn=config
+changetype: modify
+add: olcAccess
+olcAccess: {1}to dn.subtree="ou=users,dc=graph,dc=data"
+  by dn.base="uid=admin4gd,dc=graph,dc=data" write
+EOF
+```
+
+Then LDAP_DSN environment variable to use with this approach is:
+
+```bash
+export LDAP_DSN="ldaps://uid=admin4gd,dc=graph,dc=data:adminpw@`
+                        `localhost/ou=users,dc=graph,dc=data`
+                        `?user_field=uid"
+```
+
+To manually configure this LDAP using a web UI, one can use this:
+
+```bash
+docker run --rm \
+           -d \
+           --name gd-ldap-admin \
+           --network gd-network \
+           --env PHPLDAPADMIN_LDAP_HOSTS=gd-ldap \
+           osixia/phpldapadmin:0.7.2
+
+# To show the web UI URL
+GD_LDAPADMIN_IP=$(
+  docker container inspect gd-ldap-admin \
+  | jq -r '.[].NetworkSettings.Networks["gd-network"].IPAddress'
+)
+echo https://$GD_LDAPADMIN_IP
+```
 
 
 ## Back-end setup
