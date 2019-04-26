@@ -158,7 +158,7 @@ instead of the frozen versions
 (these are the direct dependencies):
 
 ```bash
-pip install sanic sanic-cors sqlalchemy asyncpgsa bonsai
+pip install sanic sanic-cors sqlalchemy asyncpgsa bonsai jwcrypto
 ```
 
 To run the web server in a already activated virtual environment
