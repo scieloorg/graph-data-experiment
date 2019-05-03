@@ -19,7 +19,7 @@ CORS(app, automatic_options=True)
 app.static("/", "dist/index.html")
 app.static("/main.css", "dist/main.css")
 app.static("/main.js", "dist/main.js")
-ldap = LDAPAuth(os.environ["LDAP_DSN"])
+ldap = LDAPAuth(os.environ["GD_LDAP_DSN"])
 
 
 async def authenticate(username, password):
@@ -30,13 +30,13 @@ async def authenticate(username, password):
 jwe = SanicJWEAuth(app, authenticate,
     auth_exceptions=[LDAPError, TypeError],
     realm="gd",
-    octet=os.environ["JWK_OCTET"],
+    octet=os.environ["GD_JWK_OCTET"],
 )
 
 
 @app.listener("before_server_start")
 async def setup_db(app, loop):
-    await pg.init(os.environ["PGSQL_URL"])
+    await pg.init(os.environ["GD_PGSQL_DSN"])
 
 
 @app.exception(asyncpg.IntegrityConstraintViolationError)

@@ -39,14 +39,14 @@ Assuming you have ``alembic`` and ``psycopg2``
 you can bootstrap that database with the migration scripts:
 
 ```bash
-export PGSQL_URL=postgres://user:pass@localhost:5432/histdb
+export GD_PGSQL_DSN=postgres://user:pass@localhost:5432/histdb
 alembic upgrade head
 ```
 
 These "local" PostgreSQL credentials are the ones
 from the docker call in the example.
 To bootstrap this otherwhere
-just replace the PGSQL_URL environment variable
+just replace the `GD_PGSQL_DSN` environment variable
 with the actual credentials.
 
 
@@ -114,14 +114,6 @@ olcAccess: {1}to dn.subtree="ou=users,dc=graph,dc=data"
 EOF
 ```
 
-Then LDAP_DSN environment variable to use with this approach is:
-
-```bash
-export LDAP_DSN="ldaps://uid=admin4gd,dc=graph,dc=data:adminpw@`
-                        `localhost/ou=users,dc=graph,dc=data`
-                        `?user_field=uid"
-```
-
 To manually configure this LDAP using a web UI, one can use this:
 
 ```bash
@@ -162,10 +154,14 @@ pip install sanic sanic-cors sqlalchemy asyncpgsa bonsai jwcrypto
 ```
 
 To run the web server in a already activated virtual environment
-(replace the PostgreSQL credentials with the actual ones):
+(replace the octet and credentials with the actual ones):
 
 ```bash
-export PGSQL_URL=postgres://user:pass@localhost:5432/histdb
+export GD_PGSQL_DSN=postgres://user:pass@localhost:5432/histdb
+export GD_LDAP_DSN="ldaps://uid=admin4gd,dc=graph,dc=data:adminpw@`
+                           `localhost/ou=users,dc=graph,dc=data`
+                           `?user_field=uid"
+export GD_JWK_OCTET="$(head -c32 /dev/urandom | base64)"
 ./server.py
 ```
 
