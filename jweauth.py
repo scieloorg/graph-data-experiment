@@ -2,7 +2,7 @@ from functools import update_wrapper
 from time import time
 
 from jwcrypto.jwe import InvalidJWEData
-from jwcrypto.jwt import JWTExpired
+from jwcrypto.jwt import JWTExpired, JWTNotYetValid
 from sanic import response
 
 from jweconv import JWEConverter
@@ -105,6 +105,8 @@ class SanicJWEAuth:
             The bearer token isn't a JWE token.
         jwcrypto.jwt.JWTExpired
             Token had already expired.
+        jwcrypto.jwt.JWTNotYetValid
+            The token "nbf" (Not Before) claim is before now.
         jwcrypto.jwt.JWTMissingClaim
             A required field ("sub"/"exp"/"nbf") isn't in the token.
         """
@@ -140,6 +142,8 @@ class SanicJWEAuth:
                     jwe = self.get_jwe(request, check_exp=check_exp)
                 except (NoAuthorizationHeader, UnknownAuthorizationHeader):
                     return self.unauthorized()
+                except JWTNotYetValid:
+                    return self.unauthorized(error="unsynchronized")
                 except (InvalidJWEData, JWTExpired):
                     return self.unauthorized(error="invalid_token")
                 session = {self.fields.get(k, k): v for k, v in jwe.items()}
@@ -198,6 +202,8 @@ class SanicJWEAuth:
             jwe = self.get_jwe(request, check_exp=False)
         except (NoAuthorizationHeader, UnknownAuthorizationHeader):
             return self.unauthorized()
+        except JWTNotYetValid:
+            return self.unauthorized(error="unsynchronized")
         except InvalidJWEData:
             return self.unauthorized(error="invalid_token")
         if time() - jwe["nbf"] > self.session_duration:
