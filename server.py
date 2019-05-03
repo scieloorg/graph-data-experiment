@@ -9,6 +9,7 @@ from sanic_cors import CORS
 from sqlalchemy import select
 import ujson
 
+from jweauth import SanicJWEAuth
 from ldapauth import LDAPAuth, LDAPError
 from models import t_user_info, t_document_hist, t_document_event
 
@@ -19,6 +20,18 @@ app.static("/", "dist/index.html")
 app.static("/main.css", "dist/main.css")
 app.static("/main.js", "dist/main.js")
 ldap = LDAPAuth(os.environ["LDAP_DSN"])
+
+
+async def authenticate(username, password):
+    await ldap.authenticate(username, password)
+    return {}
+
+
+jwe = SanicJWEAuth(app, authenticate,
+    auth_exceptions=[LDAPError, TypeError],
+    realm="gd",
+    octet=os.environ["JWK_OCTET"],
+)
 
 
 @app.listener("before_server_start")
@@ -57,25 +70,6 @@ def handle_database_exception(request, exc):
                           "message": exc.message}, status=500)
 
 
-@app.route("/auth", methods=["POST"])
-async def post_auth(request):
-    payload = request.json
-    try:
-        await ldap.authenticate(
-            user=payload["uid"],
-            password=payload["password"],
-        )
-        return response.json({"auth": True})
-    except LDAPError as exc:
-        reason = "_".join(re.findall("[A-Z][^A-Z]+",
-                                     type(exc).__name__)).lower()
-    return response.json({
-        "auth": False,
-        "error": "unauthorized",
-        "reason": reason,
-    }, status=401)
-
-
 @app.route("/user", methods=["POST"])
 async def post_user(request):
     if len(request.json) != 1 or "name" not in request.json \
@@ -101,6 +95,7 @@ async def post_user(request):
 # TODO: Find a way to add "back history" (add events between histories)
 @app.route("/document", methods=["POST"])
 @app.route("/document/<parent:uuid>", methods=["POST"])
+@jwe.require_authorization
 async def post_document(request, parent=None):
     payload = request.json
     if "pid" not in payload or not isinstance(payload["pid"], str):
@@ -210,6 +205,7 @@ async def get_edge_event(request, parent=None, hist=None):
 
 
 @app.route("/node/<hid:uuid>", methods=["PATCH"])
+@jwe.require_authorization
 async def patch_node(request, hid):
     await pg.fetchrow(t_document_hist.update().values(
         **request.json # TODO: validate the input
@@ -219,6 +215,7 @@ async def patch_node(request, hid):
 
 @app.route("/edge/<parent:uuid>/<hist:uuid>", methods=["PATCH"])
 @app.route("/edge/null/<hist:uuid>", methods=["PATCH"])
+@jwe.require_authorization
 async def patch_edge_event(request, parent=None, hist=None):
     await pg.fetchrow(t_document_event.update().values(
         **request.json # TODO: validate the input
@@ -230,6 +227,7 @@ async def patch_edge_event(request, parent=None, hist=None):
 
 
 @app.route("/node/<hid:uuid>", methods=["DELETE"])
+@jwe.require_authorization
 async def delete_node(request, hid):
     str_result = await pg.execute(
         t_document_hist.delete().where(t_document_hist.c.hid == hid)
@@ -242,6 +240,7 @@ async def delete_node(request, hid):
 
 @app.route("/edge/<parent:uuid>/<hist:uuid>", methods=["DELETE"])
 @app.route("/edge/null/<hist:uuid>", methods=["DELETE"])
+@jwe.require_authorization
 async def delete_edge_event(request, parent=None, hist=None):
     str_result = await pg.fetch(t_document_event.delete().where(
         (t_document_event.c.parent == parent) &
@@ -254,6 +253,7 @@ async def delete_edge_event(request, parent=None, hist=None):
 
 
 @app.route("/node", methods=["POST"])
+@jwe.require_authorization
 async def post_node(request):
     node_query = t_document_hist.insert().values(
         **request.json # TODO: validate the input
@@ -266,6 +266,7 @@ async def post_node(request):
 
 @app.route("/edge/<parent:uuid>/<hist:uuid>", methods=["POST"])
 @app.route("/edge/null/<hist:uuid>", methods=["POST"])
+@jwe.require_authorization
 async def post_edge_event(request, parent=None, hist=None):
     await pg.fetchrow(t_document_event.insert().values(
         parent=parent,
@@ -276,6 +277,7 @@ async def post_edge_event(request, parent=None, hist=None):
 
 
 @app.route("/node/<hid:uuid>", methods=["PUT"])
+@jwe.require_authorization
 async def put_node(request, hid):
     async with pg.transaction() as conn:
         await conn.execute(
@@ -292,6 +294,7 @@ async def put_node(request, hid):
 
 @app.route("/edge/<parent:uuid>/<hist:uuid>", methods=["PUT"])
 @app.route("/edge/null/<hist:uuid>", methods=["PUT"])
+@jwe.require_authorization
 async def put_edge_event(request, parent=None, hist=None):
     async with pg.transaction() as conn:
         await conn.execute(t_document_event.delete().where(
@@ -307,6 +310,7 @@ async def put_edge_event(request, parent=None, hist=None):
 
 
 @app.route("/node")
+@jwe.require_authorization
 async def get_nodes(request):
     get_nodes_query = select([t_document_hist.c.hid])
     nodes = await pg.fetch(get_nodes_query)
@@ -314,6 +318,7 @@ async def get_nodes(request):
 
 
 @app.route("/edge")
+@jwe.require_authorization
 async def get_edges(request):
     get_edges_query = select([t_document_event.c.parent,
                               t_document_event.c.hist])
