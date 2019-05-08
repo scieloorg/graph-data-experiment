@@ -1,6 +1,7 @@
 from time import time
 
 from jwcrypto import jwe, jwk, jwt
+from jwcrypto.common import base64url_encode
 import ujson
 
 
@@ -10,7 +11,7 @@ class JWEConverter:
     and their serialized JWE encrypted string representation,
     using a single symmetric key.
     """
-    def __init__(self, octet=None):
+    def __init__(self, octet=None, alg="A256KW", enc="A256CBC-HS512"):
         """
         Parameters
         ----------
@@ -21,15 +22,23 @@ class JWEConverter:
             ``jwcrypto.jwk.JWK(generate="oct", size=256).get_op_key()``
             or something similar with other size.
             The default behavior is to generate a random key.
+        alg : str
+            The algorithm to be used to encrypt the CEK
+            (The JWE's ``encrypted_key`` in its JSON format)
+            More information in the section 4.1.1 of RFC7516.
+        enc : str
+            The actual encryption algorithm.
+            More information in the section 4.1.2 of RFC7516.
         """
         if octet is None:
             self.key = jwk.JWK(generate="oct", size=256)
         else:
             self.key = jwk.JWK(k=octet, kty="oct")
+        self.header = {"alg": alg, "enc": enc}
 
     def encrypt(self, claims, exp_delta=60 * 5, nbf=None, sub=None):
         """Serialize a Python dictionary object
-        into a compact JWE token string.
+        into a compact JWE token string without the protected header.
 
         Parameters
         ----------
@@ -60,12 +69,17 @@ class JWEConverter:
         )
         token.make_signed_token(self.key)
         payload = token.serialize().encode("utf-8")
-        protected = '{"alg":"A256KW","enc":"A256CBC-HS512"}'
-        etoken = jwe.JWE(payload, protected, recipient=self.key)
-        return etoken.serialize(compact=True)
+        etoken = jwe.JWE(payload, header=self.header, recipient=self.key)
+        jwe_dict = etoken.objects
+        return ".".join(map(base64url_encode, [
+            jwe_dict["encrypted_key"],
+            jwe_dict["iv"],
+            jwe_dict["ciphertext"],
+            jwe_dict["tag"],
+        ]))
 
     def decrypt(self, token_str, check_exp=True):
-        """Convert a serialized JWE token string
+        """Convert a serialized JWE token string without its header
         into a Python dictionary with its contents.
 
         Parameters
@@ -83,7 +97,10 @@ class JWEConverter:
             a ``jwcrypto.jwt.JWTExpired`` exception is raised.
         """
         etoken = jwe.JWE()
-        etoken.deserialize(token_str)
+        headerless_jwe = dict(zip(["encrypted_key", "iv", "ciphertext", "tag"],
+                                  token_str.split(".")))
+        etoken_dict = {"header": self.header, **headerless_jwe}
+        etoken.deserialize(ujson.dumps(etoken_dict))
         etoken.decrypt(self.key)
         token = jwt.JWT(
             key=self.key,
