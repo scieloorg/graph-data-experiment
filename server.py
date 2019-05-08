@@ -24,11 +24,12 @@ ldap = LDAPAuth(os.environ["GD_LDAP_DSN"])
 
 async def authenticate(username, password):
     await ldap.authenticate(username, password)
-    return {}
+    return {"role": "admin"}
 
 
 jwe = SanicJWEAuth(app, authenticate,
     auth_exceptions=[LDAPInvalidCredentials, LDAPUserNotFound, TypeError],
+    session_fields={"uid": "sub", "role": "r"},
     realm="gd",
     octet=os.environ["GD_JWK_OCTET"],
 )
@@ -68,6 +69,15 @@ def handle_database_data_error(request, exc):
 def handle_database_exception(request, exc):
     return response.json({"error": "internal_database_error",
                           "message": exc.message}, status=500)
+
+
+@app.route("/user")
+@jwe.require_authorization
+async def get_user(request):
+    return response.json({
+        "session": request["session"],
+        "jwe": jwe.get_jwe(request)
+    })
 
 
 @app.route("/user", methods=["POST"])
