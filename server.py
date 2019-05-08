@@ -124,7 +124,7 @@ async def post_document(request, parent=None):
         edge = await conn.fetchrow(t_document_event.insert().values(
             parent=parent,
             hist=node["hid"],
-            uid="danilo", # TODO: Unhardcode this
+            uid=request["session"]["uid"],
             reason="insert" if parent is None else "update",
         ).returning(t_document_event.c.tstamp))
     return response.json({
