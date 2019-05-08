@@ -1,11 +1,10 @@
 from functools import update_wrapper
 from time import time
 
-from jwcrypto.jwe import InvalidJWEData
-from jwcrypto.jwt import JWTExpired, JWTNotYetValid
 from sanic import response
 
-from jweconv import JWEConverter
+from jweconv import JWEConverter, JWEInvalid, JWEWithoutJSON, \
+                    JWEExpired, JWENotYetValid
 
 
 class UnknownAuthorizationHeader(Exception): pass
@@ -115,13 +114,16 @@ class SanicJWEAuth:
             No ``Authorization: ...`` header line in the request.
         UnknownAuthorizationHeader
             Authorization header isn't a bearer token.
-        jwcrypto.jwe.InvalidJWEData
+        JWEInvalid
             The bearer token isn't a JWE token.
-        jwcrypto.jwt.JWTExpired
+        JWEWithoutJSON
+            The bearer token is a JWE token
+            but its payload isn't a JSON object with claims.
+        JWEExpired
             Token had already expired.
-        jwcrypto.jwt.JWTNotYetValid
+        JWENotYetValid
             The token "nbf" (Not Before) claim is before now.
-        jwcrypto.jwt.JWTMissingClaim
+        JWEMissingClaim
             A required field ("sub"/"exp"/"nbf") isn't in the token.
         """
         access_token = get_auth_token(request)
@@ -156,9 +158,9 @@ class SanicJWEAuth:
                     jwe = self.get_jwe(request, check_exp=check_exp)
                 except (NoAuthorizationHeader, UnknownAuthorizationHeader):
                     return self.unauthorized()
-                except JWTNotYetValid:
+                except JWENotYetValid:
                     return self.unauthorized(error="unsynchronized")
-                except (InvalidJWEData, JWTExpired):
+                except (JWEInvalid, JWEWithoutJSON, JWEExpired):
                     return self.unauthorized(error="invalid_token")
                 session = {k: jwe.get(v, None)
                            for k, v in self.session_fields.items()}
@@ -219,9 +221,9 @@ class SanicJWEAuth:
             jwe = self.get_jwe(request, check_exp=False)
         except (NoAuthorizationHeader, UnknownAuthorizationHeader):
             return self.unauthorized()
-        except JWTNotYetValid:
+        except JWENotYetValid:
             return self.unauthorized(error="unsynchronized")
-        except InvalidJWEData:
+        except (JWEInvalid, JWEWithoutJSON):
             return self.unauthorized(error="invalid_token")
         if time() - jwe["nbf"] > self.session_duration:
             return self.unauthorized(error="invalid_token")
