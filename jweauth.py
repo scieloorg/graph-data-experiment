@@ -26,9 +26,9 @@ class SanicJWEAuth:
     """
     def __init__(self, app, authenticate, *, auth_exceptions, realm,
         octet=None,
-        fields={"username": "sub", "password": "p"},
+        auth_fields={"username": "sub", "password": "p"},
         route="/auth",
-        request_key="session",
+        session_request_key="session",
         session_duration=60 * 60 * 24 * 30,
         token_duration=60 * 5,
     ):
@@ -52,20 +52,20 @@ class SanicJWEAuth:
         octet : str or None
             The key-value octet sequence in base64 for a symmetric key
             stored in JWK, as required by ``jweconv.JWEConverter``.
-        fields : dict
+        auth_fields : dict
             Map of authentication fields.
             Its keys are the names of the fields
             that should appear in the POST request
             to authenticate for the first time,
             the keywords to call ``authenticate``,
-            and the keys in ``request[request_key]``
+            and the keys in ``request[session_request_key]``
             to get their contents afterwards.
             Its values are where the credentials should be stored
             in the JWE token (part of its internal JWT),
             and ``"sub"`` (some user ID) must be part of these.
         route : str
             Route for authentication (POST) and token refreshing (GET).
-        request_key : str
+        session_request_key : str
             Key in the request object of a handler
             where the ``require_authorization`` decorator
             should store the JWE contents.
@@ -74,16 +74,16 @@ class SanicJWEAuth:
         token_duration : int
             Duration in seconds for expiration of a single JWE token.
         """
-        if "sub" not in fields.values():
+        if "sub" not in auth_fields.values():
             raise ValueError('Missing "sub" user identification field')
-        if "exp" in fields.values() or "nbf" in fields.values():
+        if "exp" in auth_fields.values() or "nbf" in auth_fields.values():
             raise ValueError('Overwriting a default claim ("exp"/"nbf")')
         self.authenticate = authenticate
         self.auth_exceptions = tuple(auth_exceptions)
         self.realm = realm
         self.jc = JWEConverter(octet)
-        self.fields = fields
-        self.request_key = request_key
+        self.auth_fields = auth_fields
+        self.session_request_key = session_request_key
         self.session_duration = session_duration
         self.token_duration = token_duration
         app.add_route(self.get_handler, route, methods=["GET"])
@@ -146,8 +146,8 @@ class SanicJWEAuth:
                     return self.unauthorized(error="unsynchronized")
                 except (InvalidJWEData, JWTExpired):
                     return self.unauthorized(error="invalid_token")
-                session = {self.fields.get(k, k): v for k, v in jwe.items()}
-                request[self.request_key] = session
+                session = {k: jwe[v] for k, v in self.auth_fields.items()}
+                request[self.session_request_key] = session
                 return await afunc(request, *args, **kwargs)
             return update_wrapper(handler_wrapper, afunc)
         return decorator(*args) if args else decorator
@@ -169,7 +169,7 @@ class SanicJWEAuth:
         by means of an exception.
         """
         user_data = await self.authenticate(**auth_kwargs)
-        jwe_kwargs = {self.fields[k]: v for k, v in auth_kwargs.items()}
+        jwe_kwargs = {self.auth_fields[k]: v for k, v in auth_kwargs.items()}
         return self.jc.encrypt({**jwe_kwargs, **user_data},
                                exp_delta=self.token_duration,
                                nbf=nbf)
@@ -192,7 +192,7 @@ class SanicJWEAuth:
     async def post_handler(self, request):
         """Handler of the authentication route."""
         payload = request.json
-        if not payload or set(payload.keys()) != set(self.fields.keys()):
+        if not payload or set(payload.keys()) != set(self.auth_fields.keys()):
             return response.json({"error": "bad_request"}, status=400)
         return await self.create_response(payload)
 
@@ -208,5 +208,5 @@ class SanicJWEAuth:
             return self.unauthorized(error="invalid_token")
         if time() - jwe["nbf"] > self.session_duration:
             return self.unauthorized(error="invalid_token")
-        auth_kwargs = {k: jwe[v] for k, v in self.fields.items()}
+        auth_kwargs = {k: jwe[v] for k, v in self.auth_fields.items()}
         return await self.create_response(auth_kwargs, nbf=jwe["nbf"])
