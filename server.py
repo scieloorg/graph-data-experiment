@@ -10,7 +10,7 @@ from sqlalchemy import select
 import ujson
 
 from jweauth import SanicJWEAuth
-from ldapauth import LDAPAuth, LDAPError
+from ldapauth import LDAPAuth, LDAPInvalidCredentials, LDAPUserNotFound
 from models import t_user_info, t_document_hist, t_document_event
 
 
@@ -28,7 +28,7 @@ async def authenticate(username, password):
 
 
 jwe = SanicJWEAuth(app, authenticate,
-    auth_exceptions=[LDAPError, TypeError],
+    auth_exceptions=[LDAPInvalidCredentials, LDAPUserNotFound, TypeError],
     realm="gd",
     octet=os.environ["GD_JWK_OCTET"],
 )
