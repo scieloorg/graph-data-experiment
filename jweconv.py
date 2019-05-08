@@ -58,17 +58,12 @@ class JWEConverter:
             The default value is the current timestamp of each call.
         """
         now = int(time()) # Seconds since Epoch
-        token = jwt.JWT(
-            header={"alg": "HS256"},
-            claims=claims,
-            default_claims={
-                "exp": now + exp_delta,
-                "nbf": nbf or now,
-                "sub": sub,
-            },
-        )
-        token.make_signed_token(self.key)
-        payload = token.serialize().encode("utf-8")
+        payload = ujson.dumps({
+            "exp": now + exp_delta,
+            "nbf": nbf or now,
+            "sub": sub,
+            **claims,
+        }, ensure_ascii=False).encode("utf-8")
         etoken = jwe.JWE(payload, header=self.header, recipient=self.key)
         jwe_dict = etoken.objects
         return ".".join(map(base64url_encode, [
@@ -102,10 +97,12 @@ class JWEConverter:
         etoken_dict = {"header": self.header, **headerless_jwe}
         etoken.deserialize(ujson.dumps(etoken_dict))
         etoken.decrypt(self.key)
-        token = jwt.JWT(
-            key=self.key,
-            jwt=etoken.payload.decode("utf-8"),
-            check_claims={"exp": None if check_exp else False,
-                          "nbf": None, "sub": None},
-        )
-        return ujson.loads(token.claims)
+        claims = ujson.loads(etoken.payload.decode("utf-8"))
+        for claim_key in ["sub", "exp", "nbf"]:
+            if claim_key not in claims:
+                raise jwt.JWTMissingClaim(f'"{claim_key}" not found')
+        if check_exp and time() > claims["exp"]:
+            raise jwt.JWTExpired('"exp" claim check failed')
+        if time() < claims["nbf"]:
+            raise jwt.JWTNotYetValid('"nbf" claim check failed')
+        return claims

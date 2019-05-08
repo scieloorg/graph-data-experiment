@@ -61,7 +61,7 @@ class SanicJWEAuth:
             to authenticate for the first time,
             the keywords to call ``authenticate``.
             Its values are where the credentials should be stored
-            in the JWE token (part of its internal JWT),
+            in the JWE token (its internal claims, based on JWT),
             and ``"sub"`` (some user ID) must be part of these.
         session_fields: dict
             Map of session fields.
