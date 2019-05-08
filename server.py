@@ -80,27 +80,6 @@ async def get_user(request):
     })
 
 
-@app.route("/user", methods=["POST"])
-async def post_user(request):
-    if len(request.json) != 1 or "name" not in request.json \
-                              or not isinstance(request.json["name"], str):
-        return response.json({"error": "need_single_name_string"}, status=400)
-    name = request.json["name"]
-    user = await pg.fetchrow(
-        t_user_info.insert()
-                   .values(name=name,
-                           ldap_cn="", # TODO: Replace this by LDAP
-                           uid=name)
-                   .returning(t_user_info.c.uid, t_user_info.c.tstamp)
-    )
-    return response.json({
-        "name": name,
-        "uid": str(user["uid"]),
-        "tstamp": user["tstamp"].strftime("%Y-%m-%dT%H:%M:%S.%fZ"),
-    }
-)
-
-
 # TODO: Find a way to merge (multiple parents)
 # TODO: Find a way to add "back history" (add events between histories)
 @app.route("/document", methods=["POST"])
