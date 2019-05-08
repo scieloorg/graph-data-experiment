@@ -225,5 +225,12 @@ class SanicJWEAuth:
             return self.unauthorized(error="invalid_token")
         if time() - jwe["nbf"] > self.session_duration:
             return self.unauthorized(error="invalid_token")
+        exp_minus_now = jwe["exp"] - int(time())
+        if exp_minus_now > 0:
+            return response.json({
+                "access_token": get_auth_token(request),
+                "token_type": "bearer",
+                "expires_in": exp_minus_now,
+            })
         auth_kwargs = {k: jwe[v] for k, v in self.auth_fields.items()}
         return await self.create_response(auth_kwargs, nbf=jwe["nbf"])
