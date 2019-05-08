@@ -28,6 +28,7 @@ class SanicJWEAuth:
         octet=None,
         auth_fields={"username": "sub", "password": "p"},
         route="/auth",
+        session_fields={"username": "sub"},
         session_request_key="session",
         session_duration=60 * 60 * 24 * 30,
         token_duration=60 * 5,
@@ -41,7 +42,8 @@ class SanicJWEAuth:
             should be added.
         authenticate : coroutine function
             Async/coroutine function that performs authentication,
-            returning user data as a dict to be merged in the tokens.
+            returning user data as a dict to be merged in the tokens
+            after transforming it with ``session_fields``.
             It should raise an exception when the authentication fails.
         auth_exceptions : iterable containing classes
             All exceptions that the given ``authenticate`` might raise
@@ -57,12 +59,21 @@ class SanicJWEAuth:
             Its keys are the names of the fields
             that should appear in the POST request
             to authenticate for the first time,
-            the keywords to call ``authenticate``,
-            and the keys in ``request[session_request_key]``
-            to get their contents afterwards.
+            the keywords to call ``authenticate``.
             Its values are where the credentials should be stored
             in the JWE token (part of its internal JWT),
             and ``"sub"`` (some user ID) must be part of these.
+        session_fields: dict
+            Map of session fields.
+            Its keys are how the field is returned by ``authenticate``
+            and how it'll appear in ``request[session_request_key]``.
+            Its values are the keys where this data should be stored
+            in the token.
+            If it overlaps the authentication credentials,
+            the ``authenticate`` result for the overlapping fields
+            will get replaced by the authentication inputs.
+            The ``authenticate`` don't need to return every field,
+            the default value for missing fields is ``None``.
         route : str
             Route for authentication (POST) and token refreshing (GET).
         session_request_key : str
@@ -76,13 +87,16 @@ class SanicJWEAuth:
         """
         if "sub" not in auth_fields.values():
             raise ValueError('Missing "sub" user identification field')
-        if "exp" in auth_fields.values() or "nbf" in auth_fields.values():
+        if "exp" in auth_fields.values() or "nbf" in auth_fields.values() \
+                                         or "exp" in session_fields.values() \
+                                         or "nbf" in session_fields.values():
             raise ValueError('Overwriting a default claim ("exp"/"nbf")')
         self.authenticate = authenticate
         self.auth_exceptions = tuple(auth_exceptions)
         self.realm = realm
         self.jc = JWEConverter(octet)
         self.auth_fields = auth_fields
+        self.session_fields = session_fields
         self.session_request_key = session_request_key
         self.session_duration = session_duration
         self.token_duration = token_duration
@@ -146,7 +160,8 @@ class SanicJWEAuth:
                     return self.unauthorized(error="unsynchronized")
                 except (InvalidJWEData, JWTExpired):
                     return self.unauthorized(error="invalid_token")
-                session = {k: jwe[v] for k, v in self.auth_fields.items()}
+                session = {k: jwe.get(v, None)
+                           for k, v in self.session_fields.items()}
                 request[self.session_request_key] = session
                 return await afunc(request, *args, **kwargs)
             return update_wrapper(handler_wrapper, afunc)
@@ -169,8 +184,10 @@ class SanicJWEAuth:
         by means of an exception.
         """
         user_data = await self.authenticate(**auth_kwargs)
-        jwe_kwargs = {self.auth_fields[k]: v for k, v in auth_kwargs.items()}
-        return self.jc.encrypt({**jwe_kwargs, **user_data},
+        session_jwe = {self.session_fields[k]: v for k, v in user_data.items()
+                                                 if k in self.session_fields}
+        auth_jwe = {self.auth_fields[k]: v for k, v in auth_kwargs.items()}
+        return self.jc.encrypt({**session_jwe, **auth_jwe},
                                exp_delta=self.token_duration,
                                nbf=nbf)
 
