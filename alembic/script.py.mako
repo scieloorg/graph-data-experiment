@@ -1,19 +1,21 @@
-"""${message}
+<%!
+    import json
+    import re
 
-Revision ID: ${up_revision}
-Revises: ${down_revision | comma,n}
-Create Date: ${create_date}
-
-"""
+    def dump(obj):
+        """Alternative "repr" with double quotes for strings/None."""
+        return re.sub(r"^null$", "None", json.dumps(obj))
+%>\
 from alembic import op
 import sqlalchemy as sa
-${imports if imports else ""}
+${imports if imports else ""}\
 
-# revision identifiers, used by Alembic.
-revision = ${repr(up_revision)}
-down_revision = ${repr(down_revision)}
-branch_labels = ${repr(branch_labels)}
-depends_on = ${repr(depends_on)}
+
+# Identifiers used by Alembic with generated codes (script.py.mako)
+revision = ${dump(up_revision)}
+down_revision = ${dump(down_revision)}
+branch_labels = ${dump(branch_labels)}
+depends_on = ${dump(depends_on)}
 
 
 def upgrade():

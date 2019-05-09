@@ -1,5 +1,3 @@
-from __future__ import with_statement
-
 import os, sys
 from logging.config import fileConfig
 
@@ -9,6 +7,7 @@ from sqlalchemy import pool
 
 sys.path = sys.path + [os.path.abspath(".")]
 from models import metadata
+
 
 config = context.config
 fileConfig(config.config_file_name) # Setup loggers
@@ -32,9 +31,7 @@ def run_migrations_online():
         poolclass=pool.NullPool,
     )
     with connectable.connect() as connection:
-        context.configure(
-            connection=connection, target_metadata=metadata
-        )
+        context.configure(connection=connection, target_metadata=metadata)
         with context.begin_transaction():
             context.run_migrations()
 
