@@ -16,7 +16,7 @@ fileConfig(config.config_file_name) # Setup loggers
 
 def run_migrations_offline():
     context.configure(
-        url=os.environ["PGSQL_URL"],
+        url=os.environ["GD_PGSQL_DSN"],
         target_metadata=metadata,
         literal_binds=True,
     )
@@ -27,7 +27,7 @@ def run_migrations_offline():
 def run_migrations_online():
     connectable = engine_from_config(
         config.get_section(config.config_ini_section),
-        url=os.environ["PGSQL_URL"],
+        url=os.environ["GD_PGSQL_DSN"],
         prefix="sqlalchemy.",
         poolclass=pool.NullPool,
     )
