@@ -150,7 +150,8 @@ instead of the frozen versions
 (these are the direct dependencies):
 
 ```bash
-pip install sanic sanic-cors sqlalchemy asyncpgsa bonsai jwcrypto
+pip install sanic sanic-cors sanic-prometheus \
+            asyncpgsa sqlalchemy bonsai jwcrypto
 ```
 
 To run the web server in a already activated virtual environment
@@ -164,6 +165,10 @@ export GD_LDAP_DSN="ldaps://uid=admin4gd,dc=graph,dc=data:adminpw@`
 export GD_JWK_OCTET="$(head -c32 /dev/urandom | base64)"
 ./server.py
 ```
+
+The Prometheus `/metrics` entry point is part of this application.
+To use another port to serve for such route,
+specify the port in the `GD_PROMETHEUS_PORT` environment variable.
 
 
 ## Front-end setup

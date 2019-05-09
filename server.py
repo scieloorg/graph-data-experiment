@@ -6,6 +6,7 @@ import asyncpg
 from asyncpgsa import pg
 from sanic import response, Sanic
 from sanic_cors import CORS
+from sanic_prometheus import monitor
 from sqlalchemy import select
 import ujson
 
@@ -20,6 +21,19 @@ app.static("/", "dist/index.html")
 app.static("/main.css", "dist/main.css")
 app.static("/main.js", "dist/main.js")
 ldap = LDAPAuth(os.environ["GD_LDAP_DSN"])
+
+
+try:
+    try:
+        monitor_port = int(os.environ["GD_PROMETHEUS_PORT"])
+    except (KeyError, ValueError):
+        monitor(app).expose_endpoint()
+    else:
+        monitor(app).start_server(addr="0.0.0.0", port=monitor_port)
+except OSError as exc:
+    # https://github.com/prometheus/client_python/issues/155
+    if exc.errno != 98:  # TODO: Remove all this OSError workaround
+        raise            # after this Prometheus client bug gets fixed
 
 
 async def authenticate(username, password):
