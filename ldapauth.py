@@ -86,26 +86,45 @@ class LDAPAuth:
         except bonsai.AuthenticationError as exc:
             raise LDAPInvalidCredentials from exc
 
-    async def get_user_dn(self, user):
+    async def get_user_data(self, user):
+        """Get the user data in LDAP using the admin credentials.
+        The output is a ``bonsai.LDAPEntry`` object
+        This method might raise ``LDAPUserNotFound``
+        or ``LDAPInvalidCredentials`` (for invalid admin credentials).
+        """
         async with self.bind(self.admin_dn, self.admin_pass) as conn:
-            result = await conn.search(
+            search_result = await conn.search(
                 self.search_dn,
                 bonsai.LDAPSearchScope.ONELEVEL,
                 self.search_template.format(ldap_escape_query(user),
                                             **self.query_dict),
             )
-            try:
-                return str(result[0]["dn"])
-            except (IndexError, KeyError):
+            if not search_result:
                 raise LDAPUserNotFound
+            return search_result[0]
 
     async def authenticate(self, user, password):
+        """Authenticate the user in LDAP returning his/her/its data
+        as a ``bonsai.LDAPEntry`` object (which inherits from dict).
+
+        Raises
+        ------
+        LDAPUserNotFound
+            The search performed with the administrator account
+            can't find the user.
+        LDAPInvalidCredentials
+            The user was found, but the password is wrong.
+        LDAPInvalidAdminCredentials
+            No user search was performed, as the administrator account
+            DN and/or password is wrong.
+        """
         try:
-            dn = await self.get_user_dn(user)
+            user_data = await self.get_user_data(user)
+            dn = str(user_data["dn"])
         except LDAPInvalidCredentials:
             raise LDAPInvalidAdminCredentials
         async with self.bind(dn, password):
-            return None
+            return user_data
 
 
 LDAPAuth.__doc__ = LDAPAuth.__doc__.format(**globals())
