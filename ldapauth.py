@@ -77,6 +77,10 @@ class LDAPAuth:
 
     @asynccontextmanager
     async def bind(self, dn, password):
+        """Asynchronous context manager for the LDAP BIND operation,
+        yielding the open connection (``bonsai.Connection`` instance)
+        or raising an ``LDAPInvalidCredentials``.
+        """
         client = bonsai.LDAPClient(self.url)
         client.set_cert_policy("allow") # TODO: Add certificate
         client.set_credentials("SIMPLE", user=dn, password=password)
