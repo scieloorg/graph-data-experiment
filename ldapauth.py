@@ -90,18 +90,21 @@ class LDAPAuth:
         """Get the user data in LDAP using the admin credentials.
         The output is a ``bonsai.LDAPEntry`` object
         This method might raise ``LDAPUserNotFound``
-        or ``LDAPInvalidCredentials`` (for invalid admin credentials).
+        or ``LDAPInvalidAdminCredentials``.
         """
-        async with self.bind(self.admin_dn, self.admin_pass) as conn:
-            search_result = await conn.search(
-                self.search_dn,
-                bonsai.LDAPSearchScope.ONELEVEL,
-                self.search_template.format(ldap_escape_query(user),
-                                            **self.query_dict),
-            )
-            if not search_result:
-                raise LDAPUserNotFound
-            return search_result[0]
+        try:
+            async with self.bind(self.admin_dn, self.admin_pass) as conn:
+                search_result = await conn.search(
+                    self.search_dn,
+                    bonsai.LDAPSearchScope.ONELEVEL,
+                    self.search_template.format(ldap_escape_query(user),
+                                                **self.query_dict),
+                )
+        except LDAPInvalidCredentials as exc:
+            raise LDAPInvalidAdminCredentials from exc.__cause__
+        if not search_result:
+            raise LDAPUserNotFound
+        return search_result[0]
 
     async def authenticate(self, user, password):
         """Authenticate the user in LDAP returning his/her/its data
@@ -118,11 +121,8 @@ class LDAPAuth:
             No user search was performed, as the administrator account
             DN and/or password is wrong.
         """
-        try:
-            user_data = await self.get_user_data(user)
-            dn = str(user_data["dn"])
-        except LDAPInvalidCredentials:
-            raise LDAPInvalidAdminCredentials
+        user_data = await self.get_user_data(user)
+        dn = str(user_data["dn"])
         async with self.bind(dn, password):
             return user_data
 
