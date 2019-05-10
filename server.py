@@ -13,6 +13,7 @@ import ujson
 from jweauth import SanicJWEAuth
 from ldapauth import LDAPAuth, LDAPInvalidCredentials, LDAPUserNotFound
 from models import t_user_info, t_document_hist, t_document_event
+from misc import nestget_str
 
 
 app = Sanic(__name__)
@@ -37,13 +38,16 @@ except OSError as exc:
 
 
 async def authenticate(username, password):
-    await ldap.authenticate(username, password)
-    return {"role": "admin"}
+    user_data = await ldap.authenticate(username, password, attrs=["cn"])
+    return {
+        "role": "admin",
+        "name": nestget_str(user_data, "cn", 0),
+    }
 
 
 jwe = SanicJWEAuth(app, authenticate,
     auth_exceptions=[LDAPInvalidCredentials, LDAPUserNotFound, TypeError],
-    session_fields={"uid": "sub", "role": "r"},
+    session_fields={"uid": "sub", "role": "r", "name": "n"},
     realm="gd",
     octet=os.environ["GD_JWK_OCTET"],
 )
