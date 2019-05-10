@@ -14,9 +14,8 @@ metadata = MetaData()
 t_user_info = Table(
     "user_info", metadata,
     Column("uid", String, primary_key=True),
-    Column("name", String, nullable=False),
-    Column("ldap_cn", String, nullable=False),
     Column("tstamp", DateTime, nullable=False, server_default=SQL_UTC),
+    Column("last_auth", DateTime, nullable=False, server_default=SQL_UTC),
 )
 
 t_document_hist = Table(
@@ -26,7 +25,6 @@ t_document_hist = Table(
     Column("title", String, nullable=False),
     Column("metadata", JSONB, nullable=False, server_default=text("'{}'")),
     Column("published", Boolean, server_default=text("false")),
-    Column("deleted", Boolean, server_default=text("false")),
     Column("tstamp", DateTime),
 )
 
