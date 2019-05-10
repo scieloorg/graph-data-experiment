@@ -37,8 +37,17 @@ except OSError as exc:
         raise            # after this Prometheus client bug gets fixed
 
 
+class AuthError(Exception):
+    pass
+
+
 async def authenticate(username, password):
-    user_data = await ldap.authenticate(username, password, attrs=["cn"])
+    if not (isinstance(username, str) and isinstance(password, str)):
+        raise AuthError("Invalid data type")
+    try:
+        user_data = await ldap.authenticate(username, password, attrs=["cn"])
+    except (LDAPInvalidCredentials, LDAPUserNotFound):
+        raise AuthError("Invalid credentials")
     return {
         "role": "admin",
         "name": nestget_str(user_data, "cn", 0),
@@ -46,7 +55,7 @@ async def authenticate(username, password):
 
 
 jwe = SanicJWEAuth(app, authenticate,
-    auth_exceptions=[LDAPInvalidCredentials, LDAPUserNotFound, TypeError],
+    auth_exceptions=[AuthError],
     session_fields={"uid": "sub", "role": "r", "name": "n"},
     realm="gd",
     octet=os.environ["GD_JWK_OCTET"],
