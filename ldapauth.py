@@ -90,9 +90,11 @@ class LDAPAuth:
         except bonsai.AuthenticationError as exc:
             raise LDAPInvalidCredentials from exc
 
-    async def get_user_data(self, user):
+    async def get_user_data(self, user, *, attrs=("dn",)):
         """Get the user data in LDAP using the admin credentials.
-        The output is a ``bonsai.LDAPEntry`` object
+        The output is a ``bonsai.LDAPEntry`` object, whose keys
+        are ``"dn"`` and all attributes in the ``attrs`` iterable
+        (set ``attrs=[]`` or ``None`` to get all non-empty attributes).
         This method might raise ``LDAPUserNotFound``
         or ``LDAPInvalidAdminCredentials``.
         """
@@ -103,6 +105,7 @@ class LDAPAuth:
                     bonsai.LDAPSearchScope.ONELEVEL,
                     self.search_template.format(ldap_escape_query(user),
                                                 **self.query_dict),
+                    attrlist=None if attrs is None else list(attrs),
                 )
         except LDAPInvalidCredentials as exc:
             raise LDAPInvalidAdminCredentials from exc.__cause__
@@ -110,9 +113,11 @@ class LDAPAuth:
             raise LDAPUserNotFound
         return search_result[0]
 
-    async def authenticate(self, user, password):
+    async def authenticate(self, user, password, **kwargs):
         """Authenticate the user in LDAP returning his/her/its data
         as a ``bonsai.LDAPEntry`` object (which inherits from dict).
+        See the ``get_user_data`` method
+        for more information about the parameters.
 
         Raises
         ------
@@ -125,7 +130,7 @@ class LDAPAuth:
             No user search was performed, as the administrator account
             DN and/or password is wrong.
         """
-        user_data = await self.get_user_data(user)
+        user_data = await self.get_user_data(user, **kwargs)
         dn = str(user_data["dn"])
         async with self.bind(dn, password):
             return user_data
