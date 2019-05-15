@@ -8,11 +8,12 @@ from sanic import response, Sanic
 from sanic_cors import CORS
 from sanic_prometheus import monitor
 from sqlalchemy import select
+from sqlalchemy.dialects.postgresql import insert
 import ujson
 
 from jweauth import SanicJWEAuth
 from ldapauth import LDAPAuth, LDAPInvalidCredentials, LDAPUserNotFound
-from models import t_user_info, t_document_hist, t_document_event
+from models import t_user_info, t_document_hist, t_document_event, SQL_UTC
 from misc import nestget_str
 
 
@@ -48,6 +49,14 @@ async def authenticate(username, password):
         user_data = await ldap.authenticate(username, password, attrs=["cn"])
     except (LDAPInvalidCredentials, LDAPUserNotFound):
         raise AuthError("Invalid credentials")
+    user_info = await pg.fetchrow(
+        insert(t_user_info).values(
+            uid=username,
+        ).on_conflict_do_update(
+            index_elements=["uid"],
+            set_={"last_auth": SQL_UTC},
+        )
+    )
     return {
         "role": "admin",
         "name": nestget_str(user_data, "cn", 0),
