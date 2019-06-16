@@ -60,3 +60,18 @@ null_hist_index = Index("null_hist_index",
     unique=True,
     postgresql_where=t_document_event.c.parent == SQL_NULL,
 )
+
+t_snapshot = Table(
+    "snapshot", metadata,
+    Column("data", JSONB, nullable=False, primary_key=True),
+    Column("source", String, nullable=False, primary_key=True),
+    Column("tstamp", DateTime,
+        nullable=False,
+        primary_key=True,
+        server_default=SQL_UTC,
+    ),
+    Column("uid", String,
+        ForeignKey("user_info.uid", onupdate="CASCADE"),
+        nullable=False,
+    ),
+)
