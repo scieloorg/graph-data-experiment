@@ -1,4 +1,5 @@
 #!/usr/bin/env python3
+from datetime import datetime
 import os
 import re
 
@@ -13,7 +14,8 @@ import ujson
 
 from jweauth import SanicJWEAuth
 from ldapauth import LDAPAuth, LDAPInvalidCredentials, LDAPUserNotFound
-from models import t_user_info, t_document_hist, t_document_event, SQL_UTC
+from models import t_user_info, t_document_hist, t_document_event, \
+                   t_snapshot, SQL_UTC
 from misc import nestget_str
 
 
@@ -352,6 +354,22 @@ async def get_edges(request):
         "parent": edge["parent"] and str(edge["parent"]),
         "hist": str(edge["hist"]),
     } for edge in edges]})
+
+
+@app.route("/snapshot", methods=["POST"])
+@jwe.require_authorization
+async def post_snapshot(request):
+    if not request.json or "uid" in request.json:
+        return response.json({"error": "invalid_snapshot"}, status=400)
+    data = {**request.json, "uid": request["session"]["uid"]}
+    if "tstamp" in data:
+        data["tstamp"] = datetime.fromtimestamp(data["tstamp"])
+    query = t_snapshot.insert().values(**data).returning(t_snapshot.c.tstamp)
+    snapshot = await pg.fetchrow(query)
+    return response.json({
+        "status": "inserted",
+        "tstamp": snapshot["tstamp"].strftime("%Y-%m-%dT%H:%M:%S.%fZ"),
+    })
 
 
 if __name__ == "__main__":
