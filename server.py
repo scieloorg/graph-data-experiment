@@ -8,7 +8,7 @@ from asyncpgsa import pg
 from sanic import response, Sanic
 from sanic_cors import CORS
 from sanic_prometheus import monitor
-from sqlalchemy import select
+from sqlalchemy import func, literal, select
 from sqlalchemy.dialects.postgresql import insert
 import ujson
 
@@ -369,6 +369,35 @@ async def post_snapshot(request):
     return response.json({
         "status": "inserted",
         "tstamp": snapshot["tstamp"].strftime("%Y-%m-%dT%H:%M:%S.%fZ"),
+    })
+
+
+@app.route("/snapshot/batch", methods=["POST"])
+@jwe.require_authorization
+async def post_snapshot_batch(request):
+    rows = []
+    for row in request.body.splitlines():
+        unicode_row = row.strip().decode("utf-8")
+        if unicode_row:
+            row_data = ujson.loads(unicode_row)
+            if "uid" in row_data:
+                return response.json({"error": "invalid_snapshot"}, status=400)
+            data = {**row_data, "uid": request["session"]["uid"]}
+            if "tstamp" in data:
+                data["tstamp"] = datetime.fromtimestamp(data["tstamp"])
+            rows.append(data)
+    if rows:
+        query = select(
+            columns=[func.count()],
+            from_obj=t_snapshot.insert().values(rows).returning(literal("1"))
+                               .cte("rows"),
+        )
+        snapshot_count = await pg.fetchval(query)
+    else:
+        snapshot_count = 0
+    return response.json({
+        "status": "inserted",
+        "count": snapshot_count,
     })
 
 
