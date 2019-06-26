@@ -1,6 +1,6 @@
 from sqlalchemy import Column, ForeignKey, Index, MetaData, Table, \
                        null, text, \
-                       Boolean, DateTime, String
+                       Boolean, DateTime, LargeBinary, String
 from sqlalchemy.dialects.postgresql import JSONB, UUID
 
 
@@ -63,7 +63,8 @@ null_hist_index = Index("null_hist_index",
 
 t_snapshot = Table(
     "snapshot", metadata,
-    Column("data", JSONB, nullable=False, primary_key=True),
+    Column("data", JSONB, nullable=False),
+    Column("digest", LargeBinary(40), primary_key=True),
     Column("source", String, nullable=False, primary_key=True),
     Column("tstamp", DateTime,
         nullable=False,
