@@ -389,8 +389,10 @@ async def post_snapshot_batch(request):
     if rows:
         query = select(
             columns=[func.count()],
-            from_obj=t_snapshot.insert().values(rows).returning(literal("1"))
-                               .cte("rows"),
+            from_obj=insert(t_snapshot).values(rows)
+                                       .on_conflict_do_nothing()
+                                       .returning(literal("1"))
+                                       .cte("rows"),
         )
         snapshot_count = await pg.fetchval(query)
     else:
