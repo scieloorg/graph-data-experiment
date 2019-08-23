@@ -17,14 +17,15 @@ For a single temporary example
 one can use the default Docker image, for example:
 
 ```bash
-docker run --rm \
-           -d \
+docker network create gd-network
+docker run -d \
            -p 5432:5432 \
            -e POSTGRES_USER=user \
            -e POSTGRES_PASSWORD=pass \
            -e POSTGRES_DB=histdb \
            --name pgdb \
-           postgres
+           --network gd-network \
+           postgres:11.5-alpine
 ```
 
 One still needs to initialize this database.
@@ -58,20 +59,19 @@ An example using OpenLDAP v2.4.47:
 
 ```bash
 LDAP_MAIN_PASSWORD=$(head -c9 /dev/urandom | hexdump -e '"%x"')
+echo 'Save this after running for the first time!!!'
+echo "export LDAP_MAIN_PASSWORD='$LDAP_MAIN_PASSWORD'"
 
-docker network create gd-network
-docker run --rm \
-           -d \
+docker run -d \
            -p 636:636 \
            --name gd-ldap \
-           --hostname graph.data \
            --network gd-network \
            --env LDAP_ADMIN_PASSWORD="$LDAP_MAIN_PASSWORD" \
            --env LDAP_CONFIG_PASSWORD="$LDAP_MAIN_PASSWORD" \
            --env LDAP_DOMAIN="graph.data" \
            --env LDAP_ORGANISATION="Organise & Organize Company Ltd." \
            --env LDAP_TLS_VERIFY_CLIENT=try \
-           osixia/openldap:1.2.4
+           osixia/openldap:1.2.5
 
 # Create an organizational unit, a common user and an "admin" user
 docker exec -i gd-ldap ldapadd -x \
@@ -122,7 +122,7 @@ docker run --rm \
            --name gd-ldap-admin \
            --network gd-network \
            --env PHPLDAPADMIN_LDAP_HOSTS=gd-ldap \
-           osixia/phpldapadmin:0.7.2
+           osixia/phpldapadmin:0.8.0
 
 # To show the web UI URL
 GD_LDAPADMIN_IP=$(
@@ -133,7 +133,7 @@ echo https://$GD_LDAPADMIN_IP
 ```
 
 
-## Back-end setup
+## Back-end setup (development)
 
 This server requires Python 3.7+.
 To install the server dependencies/requirements (frozen versions)
@@ -171,7 +171,7 @@ To use another port to serve for such route,
 specify the port in the `GD_PROMETHEUS_PORT` environment variable.
 
 
-## Front-end setup
+## Front-end setup (development)
 
 To create the `node_modules` directory with the JavaScript packages:
 
@@ -190,3 +190,28 @@ To test/debug the front-end code (assuming the back-end is running):
 ```bash
 npx webpack-dev-server --mode development --open
 ```
+
+
+## Easier back-end and front-end setup using Docker
+
+To run the server in a "production"-like container
+using the development configuration,
+one can use:
+
+```bash
+docker build -t gd .
+docker run --rm \
+           --network gd-network \
+           -e GD_PGSQL_DSN=postgres://user:pass@pgdb:5432/histdb \
+           -e GD_LDAP_DSN="ldaps://uid=admin4gd,dc=graph,dc=data` \
+                          `:adminpw@gd-ldap` \
+                          `/ou=users,dc=graph,dc=data?user_field=uid" \
+           -e GD_JWK_OCTET="$(head -c32 /dev/urandom | base64)" \
+           -e GD_PROMETHEUS_PORT=7000 \
+           -p 8000:8000 \
+           gd
+```
+
+To run multiple containers at once with the same server above,
+the `GD_JWK_OCTET` variable should be replaced
+to be the same in all the instances/containers.
