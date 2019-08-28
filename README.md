@@ -22,7 +22,7 @@ docker run -d \
            -p 5432:5432 \
            -e POSTGRES_USER=user \
            -e POSTGRES_PASSWORD=pass \
-           -e POSTGRES_DB=histdb \
+           -e POSTGRES_DB=gd \
            --name pgdb \
            --network gd-network \
            postgres:11.5-alpine
@@ -40,7 +40,7 @@ Assuming you have ``alembic`` and ``psycopg2``
 you can bootstrap that database with the migration scripts:
 
 ```bash
-export GD_PGSQL_DSN=postgres://user:pass@localhost:5432/histdb
+export GD_PGSQL_DSN=postgres://user:pass@localhost:5432/gd
 alembic upgrade head
 ```
 
@@ -158,7 +158,7 @@ To run the web server in a already activated virtual environment
 (replace the octet and credentials with the actual ones):
 
 ```bash
-export GD_PGSQL_DSN=postgres://user:pass@localhost:5432/histdb
+export GD_PGSQL_DSN=postgres://user:pass@localhost:5432/gd
 export GD_LDAP_DSN="ldaps://uid=admin4gd,dc=graph,dc=data:adminpw@`
                            `localhost/ou=users,dc=graph,dc=data`
                            `?user_field=uid"
@@ -202,7 +202,7 @@ one can use:
 docker build -t gd .
 docker run --rm \
            --network gd-network \
-           -e GD_PGSQL_DSN=postgres://user:pass@pgdb:5432/histdb \
+           -e GD_PGSQL_DSN=postgres://user:pass@pgdb:5432/gd \
            -e GD_LDAP_DSN="ldaps://uid=admin4gd,dc=graph,dc=data` \
                           `:adminpw@gd-ldap` \
                           `/ou=users,dc=graph,dc=data?user_field=uid" \
