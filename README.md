@@ -215,3 +215,10 @@ docker run --rm \
 To run multiple containers at once with the same server above,
 the `GD_JWK_OCTET` variable should be replaced
 to be the same in all the instances/containers.
+
+The default host and port mapping can be configured
+with the `GD_HOST` and `GD_PORT` environment variables.
+
+Instead of environment variables,
+one can use docker secrets with the same variable name
+when running in a swarm.

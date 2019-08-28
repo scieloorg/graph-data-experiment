@@ -35,9 +35,8 @@ RUN apk update && \
     apk add --virtual .build-deps \
       gcc make musl-dev openldap-dev libffi-dev && \
     pip install --no-cache-dir -r requirements.txt && \
-    apk --purge del .build-deps && \
-    rm requirements.txt
+    apk --purge del .build-deps
 COPY --from=build-py /code/dist/* ./
 COPY --from=build-js /code/dist/* ./dist/
-CMD [ "python", "-umsanic", "server.app", \
-      "--host=0.0.0.0", "--port=8000" ]
+COPY run.sh .
+CMD [ "./run.sh" ]
