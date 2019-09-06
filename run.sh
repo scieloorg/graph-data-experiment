@@ -1,4 +1,4 @@
-#!/bin/sh -ex
+#!/bin/sh -e
 # Runner script that loads docker secrets as environment variables
 
 # Update all environment variables with the secrets
