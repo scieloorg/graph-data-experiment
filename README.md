@@ -152,7 +152,7 @@ instead of the frozen versions
 
 ```bash
 pip install sanic sanic-cors sanic-prometheus \
-            asyncpgsa sqlalchemy bonsai jwcrypto
+            asyncpgsa sqlalchemy bonsai jwcrypto ujson
 ```
 
 To run the web server in a already activated virtual environment
