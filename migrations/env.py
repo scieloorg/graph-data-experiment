@@ -5,7 +5,7 @@ from alembic import context
 from sqlalchemy import engine_from_config
 from sqlalchemy import pool
 
-sys.path = sys.path + [os.path.abspath(".")]
+sys.path = sys.path + [os.path.abspath("../server")]
 from models import metadata
 
 

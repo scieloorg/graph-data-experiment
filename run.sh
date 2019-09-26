@@ -15,4 +15,4 @@ fi
 # Run the server
 : ${GD_HOST:=0.0.0.0}
 : ${GD_PORT:=8000}
-python -umsanic server.app --host="$GD_HOST" --port="$GD_PORT"
+python -umsanic gd.app --host="$GD_HOST" --port="$GD_PORT"

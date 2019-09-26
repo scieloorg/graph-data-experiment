@@ -21,9 +21,9 @@ from misc import nestget_str
 
 app = Sanic(__name__)
 CORS(app, automatic_options=True)
-app.static("/", "dist/index.html")
-app.static("/main.css", "dist/main.css")
-app.static("/main.js", "dist/main.js")
+app.static("/", "client/dist/index.html")
+app.static("/main.css", "client/dist/main.css")
+app.static("/main.js", "client/dist/main.js")
 ldap = LDAPAuth(os.environ["GD_LDAP_DSN"])
 
 

@@ -2,7 +2,7 @@ FROM python:3.7.4-alpine AS build-py
 WORKDIR /code
 RUN apk update && apk add gcc musl-dev && \
     pip install --no-cache-dir cython
-COPY *.py ./
+COPY server/*.py ./
 RUN mkdir -p build dist && \
     for f in *.py ; do \
         cython -3 -o "build/${f%.py}.c" "$f" && \
@@ -22,14 +22,14 @@ RUN mkdir -p build dist && \
 FROM python:3.7.4-alpine AS build-js
 WORKDIR /code
 RUN apk update && apk add nodejs-npm
-COPY webpack.config.js package.json package-lock.json ./
-COPY src src
+COPY client/*.json client/*.js ./
+COPY client/src src
 RUN npm install
 RUN npx webpack --mode production
 
 
 FROM python:3.7.4-alpine
-COPY requirements.txt .
+COPY server/requirements.txt .
 RUN apk update && \
     apk add postgresql-libs openssl && \
     apk add --virtual .build-deps \
@@ -37,6 +37,6 @@ RUN apk update && \
     pip install --no-cache-dir -r requirements.txt && \
     apk --purge del .build-deps
 COPY --from=build-py /code/dist/* ./
-COPY --from=build-js /code/dist/* ./dist/
+COPY --from=build-js /code/dist/* ./client/dist/
 COPY run.sh .
 CMD [ "./run.sh" ]

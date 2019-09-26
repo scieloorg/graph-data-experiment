@@ -34,13 +34,14 @@ Assuming you have ``alembic`` and ``psycopg2``
  or from a virtual environment
  such as the one described in the back-end session of this text,
  by installing the frozen versions of these packages
- with ``pip install -r requirements.migrations.txt``
+ with ``pip install -r migrations/requirements.txt``
  or their current version
  with ``pip install alembic psycopg2``),
 you can bootstrap that database with the migration scripts:
 
 ```bash
 export GD_PGSQL_DSN=postgres://user:pass@localhost:5432/gd
+cd migrations # From the repository root directory
 alembic upgrade head
 ```
 
@@ -142,7 +143,7 @@ in a virtual environment:
 ```bash
 python3 -m venv venv # Create a virtual environment
 . venv/bin/activate # Activate the virtual environment
-pip install -r requirements.txt
+pip install -r server/requirements.txt
 ```
 
 Or, to install the current version of the dependencies
@@ -163,7 +164,7 @@ export GD_LDAP_DSN="ldaps://uid=admin4gd,dc=graph,dc=data:adminpw@`
                            `localhost/ou=users,dc=graph,dc=data`
                            `?user_field=uid"
 export GD_JWK_OCTET="$(head -c32 /dev/urandom | base64)"
-./server.py
+server/gd.py # From the repository root directory
 ```
 
 The Prometheus `/metrics` entry point is part of this application.
@@ -173,21 +174,20 @@ specify the port in the `GD_PROMETHEUS_PORT` environment variable.
 
 ## Front-end setup (development)
 
-To create the `node_modules` directory with the JavaScript packages:
+The commands to compile and to run a front-end debug server are:
 
 ```bash
+cd client # From the repository root directory
+
+# Create the client/node_modules directory with the JavaScript packages
+# (i.e., install the dependencies)
 npm install
-```
 
-To create the `/dist` directory (required by the back-end):
-
-```bash
+# Create the client/dist directory (required by the back-end)
 npx webpack --mode production
-```
 
-To test/debug the front-end code (assuming the back-end is running):
-
-```bash
+# Test/debug the front-end code using Node.js
+# (assuming the back-end is running)
 npx webpack-dev-server --mode development --open
 ```
 
