@@ -7,7 +7,11 @@ if [ -e "$DOCKER_SECRETS_DIR" ] ; then
   for secret_file in "$DOCKER_SECRETS_DIR"/* ; do
     secret=$(basename "$secret_file")
     eval "tmp=\$$secret"
-    test -z "$tmp"
+    if [ -n "$tmp" ] ; then
+      echo "Multiple $secret definition," \
+           "it's both a secret and an environment variable"
+      false # Propagate the error
+    fi
     export "$secret"="$(cat "$secret_file")"
   done
 fi
