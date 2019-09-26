@@ -38,5 +38,5 @@ RUN apk update && \
     apk --purge del .build-deps
 COPY --from=build-py /code/dist/* ./
 COPY --from=build-js /code/dist/* ./client/dist/
-COPY run.sh .
+COPY infra/run.sh .
 CMD [ "./run.sh" ]

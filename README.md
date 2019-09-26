@@ -199,7 +199,7 @@ using the development configuration,
 one can use:
 
 ```bash
-docker build -t gd .
+docker build -t gd -f infra/Dockerfile .
 docker run --rm \
            --network gd-network \
            -e GD_PGSQL_DSN=postgres://user:pass@pgdb:5432/gd \
