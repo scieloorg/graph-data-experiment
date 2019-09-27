@@ -24,6 +24,7 @@ CORS(app, automatic_options=True)
 app.static("/", "client/dist/index.html")
 app.static("/main.css", "client/dist/main.css")
 app.static("/main.js", "client/dist/main.js")
+app.static("/assets", "client/dist/assets")
 ldap = LDAPAuth(os.environ["GD_LDAP_DSN"])
 
 

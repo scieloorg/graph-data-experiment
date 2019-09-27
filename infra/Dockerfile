@@ -22,7 +22,7 @@ RUN mkdir -p build dist && \
 FROM python:3.7.4-alpine AS build-js
 WORKDIR /code
 RUN apk update && apk add nodejs-npm
-COPY client/*.json client/*.js ./
+COPY client/*.json client/*.js client/logo-gd.svg ./
 COPY client/src src
 RUN npm install
 RUN npx webpack --mode production
@@ -37,6 +37,6 @@ RUN apk update && \
     pip install --no-cache-dir -r requirements.txt && \
     apk --purge del .build-deps
 COPY --from=build-py /code/dist/* ./
-COPY --from=build-js /code/dist/* ./client/dist/
+COPY --from=build-js /code/dist/ ./client/dist/
 COPY infra/run.sh .
 CMD [ "./run.sh" ]
